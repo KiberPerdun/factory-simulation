@@ -11,4 +11,5 @@ add_executable(factory-simulation
         src/simulator.cpp
         src/main.cpp
         src/simulator.cpp
+        include/simulator.h
 )
