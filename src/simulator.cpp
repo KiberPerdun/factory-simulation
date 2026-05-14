@@ -4,7 +4,52 @@
 
 #include "simulator.h"
 #include <algorithm>
+#include <cctype>
+#include <fstream>
 #include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+static bool
+parse_line_to_ints (const std::string &line, std::vector<int64_t> &out)
+{
+  std::istringstream iss (line);
+  std::string token;
+  while (iss >> token)
+    {
+      if (token.empty ())
+        return false;
+
+      size_t start = 0;
+      if (token[0] == '-')
+        start = 1;
+
+      if (start == token.size ())
+        return false;
+
+      for (size_t i = start; i < token.size (); ++i)
+          if (!std::isdigit (token[i]))
+            return false;
+
+      try
+        {
+          out.push_back (std::stoll (token));
+        }
+      catch (...)
+        {
+          return false;
+        }
+    }
+  return true;
+}
+
+static void
+error_exit (const std::string &line)
+{
+  std::cout << line << "\n";
+  std::exit (1);
+}
 
 void
 FactorySimulator::run (std::string &filename)
@@ -49,6 +94,8 @@ FactorySimulator::handle_start (const Event &e)
   Machine &m = workers[e.machine_id];
   Product &item = items[e.item_id];
 
+  m.is_working = true;
+
   m.queue.pop_front ();
   m.queue_work_time -= times[item.cur_type][m.id];
 
@@ -68,6 +115,8 @@ FactorySimulator::handle_finish (const Event &e)
 {
   Machine &m = workers[e.machine_id];
   Product &item = items[e.item_id];
+
+  m.is_working = false;
 
   std::string f_msg
       = "finish " + std::to_string (cur_time) + " " + std::to_string (item.id)
@@ -89,8 +138,7 @@ FactorySimulator::handle_finish (const Event &e)
       int64_t best_j = select_best_machine (item.id);
       Machine &target_m = workers[best_j];
 
-      bool is_idle
-          = (target_m.busy_time <= cur_time && target_m.queue.empty ());
+      bool is_idle = !target_m.is_working && target_m.queue.empty ();
 
       if (!is_idle)
         {
@@ -140,25 +188,80 @@ FactorySimulator::select_best_machine (int64_t item_id)
 void
 FactorySimulator::parse_input (std::string &filename)
 {
-  std::cin >> M >> N;
+  std::ifstream file (filename);
+  if (!file.is_open ())
+    std::exit (1);
+
+  std::string line;
+  auto get_next_line = [&] ()
+  {
+    if (!std::getline (file, line))
+      std::exit (1);
+
+    if (!line.empty () && line.back () == '\r')
+      line.pop_back ();
+
+    return line;
+  };
+
+  std::vector<int64_t> nums;
+
+  line = get_next_line ();
+  if (!parse_line_to_ints (line, nums) || nums.size () != 2)
+    error_exit (line);
+
+  M = nums[0];
+  N = nums[1];
+
+  if (M < 1 || M > 100 || N < 1 || N > 100)
+    error_exit (line);
 
   times.assign (M - 1, std::vector<int64_t> (N));
   workers.resize (N);
 
   for (int64_t i = 0; i < M - 1; ++i)
-    for (int64_t j = 0; j < N; ++j)
-      std::cin >> times[i][j];
+    {
+      line = get_next_line ();
+      nums.clear ();
+      if (!parse_line_to_ints (line, nums)
+          || nums.size () != static_cast<size_t> (N))
+        error_exit (line);
+
+      for (int64_t j = 0; j < N; ++j)
+        {
+          if (nums[j] < 0 || nums[j] > 10000)
+            error_exit (line);
+
+          times[i][j] = nums[j];
+        }
+    }
 
   int64_t product_id_counter = 0;
+  int64_t total_q = 0;
+
   for (int64_t i = 0; i < N; ++i)
     {
+      line = get_next_line ();
+      nums.clear ();
+      if (!parse_line_to_ints (line, nums) || nums.empty ())
+        error_exit (line);
+
+      int64_t q = nums[0];
+      if (q < 0 || nums.size () != static_cast<size_t> (q + 1))
+        error_exit (line);
+
+      total_q += q;
+      if (total_q > 100000)
+        error_exit (line);
+
       workers[i].id = i;
-      int64_t q;
-      std::cin >> q;
       for (int64_t j = 0; j < q; ++j)
         {
-          int64_t product_type;
-          std::cin >> product_type;
+          int64_t product_type = nums[j + 1];
+
+          if (product_type < 0 || product_type > M - 2)
+            error_exit (line);
+
           Product item = { product_id_counter++, product_type, i };
           items.push_back (item);
           workers[i].queue.push_back (item.id);

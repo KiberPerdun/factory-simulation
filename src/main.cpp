@@ -7,10 +7,17 @@
 #include <iostream>
 
 int
-main ()
+main (int32_t argc, char *argv[])
 {
+  if (argc < 2)
+    {
+      std::cerr << "Usage: " << argv[0] << " <input_file>\n";
+      return 1;
+    }
+
+  std::string filename = argv[1];
   FactorySimulator sim;
-  sim.run ((std::string &)"1.txt");
+  sim.run (filename);
 
   return 0;
 }

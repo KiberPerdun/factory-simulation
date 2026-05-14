@@ -14,9 +14,9 @@
 enum class MsgType
 {
   FINISH = 1,
-  READY = 2,
+  START = 2,
   WAIT = 3,
-  START = 4,
+  READY = 4,
   STOP = 5
 };
 
@@ -59,6 +59,7 @@ struct Machine
    */
   int64_t queue_work_time = 0;
   std::deque<int64_t> queue;
+  bool is_working = false;
 };
 
 enum class EventType
